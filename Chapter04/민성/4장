@@ -1,0 +1,670 @@
+# 4.1 클래스 계층 정의
+
+## 4.1.1 코틀린 인터페이스
+
+```kotlin
+interface Clickable {
+	fun click()
+}
+```
+
+- 인터페이스에는 아무런 필드도 들어갈 수 없다.
+
+```kotlin
+class Button : Clickable {
+	override fun click() = println("I was clicked")
+}
+```
+
+- kotlin에서는 콜론(:)을 붙이고 인터페이스와 클래스 이름을 적는 것으로 확장과 구현을 모두 처리한다.
+- 자바와 마찬가지로 클래스는 인터페이스를 원하는 만큼, 클래스는 오직 하나만 확장
+- 코틀린에서는 override 변경자를 꼭 사용해야 한다.
+    - 실수로 상위 클래스의 메소드를 오버라이드하는 경우를 방지해주기 위해.
+- defualt 키워드 없이 default 구현 가능
+
+    ```kotlin
+    interface Clickable {
+    	fun click()
+    	fun showOff() = println("I'm clickable!")
+    }
+    ```
+
+- 동일한 메소드를 구현하는 다른 인터페이스 정의
+
+    ```kotlin
+    interface Clickable {
+    	fun showOff() = println("I'm clickable!")
+    }
+    interface Focusable {
+    	fun showOff() = println("I'm focusable!")
+    }
+    ```
+
+    - 컴파일 에러 → 하위 클래스에 직접 구현하게 강제
+
+        ```kotlin
+        class Button : Clickable, Focusable [
+        	override fun showOff() {
+        		super<Clickable>.showOff()
+        		super<Focusable>.showOff()
+        	}
+        }
+        ```
+
+- 
+
+```kotlin
+fun main(...) {
+
+	...
+
+	button.showOff() // I'm clickable!, I'm focusalbe 출력
+}
+```
+
+## 4.1.2 open, final, abstract 변경자: 기본적으로 final
+
+### open/final
+
+기본적으로 상속이 가능하면 취약한 기반 클래스(fragile base class)라는 문제가 발생한다. 이에 코틀린의 클래스와 메소드는 기본적으로 final이다.
+
+클래스의 상속을 허용하려면 클래스 앞에 open 변경자를 붙여야 한다. 그와 더불어 오버라이드를 허용하고 싶은 메소드나 프로퍼티의 앞에도 open 변경자를 붙여야한다.
+
+```kotlin
+open class RichButton : Clickable {
+	fun disable() {} // 이 함수는 파이널이다. 오버라이드 할 수 없다.
+	open fun animate() {} // 오버라이드 가능
+	override fun click() {} // 오버라이드한 메소드는 기본적으로 열려있다.
+	// 오버라이드하는 메소드의 구현을 하위 클래스에서 오버라이드하지 못하게 하려면 오버라이드하는 메소드 앞에 final 명시
+	// final override fun click() {}
+}
+```
+
+**열린 클래스와 스마트 캐스트**
+
+스마트 캐스트는 타입 검사 뒤에 변경될 수 없는 변수에만 적용 가능하다. 그렇기에 위의 내용들은 이에 유용하다
+
+### abstract
+
+추상 클래스는 항상 열려있기에 open 변경자를 명시할 필요가 없다.
+
+```kotlin
+abstract class Animated {
+	abstract fun animate () // 추상 함수
+	
+	open fun stopAnimating() {} // 비추상 함수는 기본적으로 파이널
+
+	fun animateTwice() {} // 비추상 함수는 open으로 허용
+}
+```
+
+## 4.1.3 가시성 변경자: 기본적으로 공개
+
+- 기본적으로 아무 변경자도 없는 경우 선언은 모두 공개(public)이다.
+- 자바의 기본 가시성인 패키지 전용(package-private)은 코틀린에 없다.
+    - 코틀린은 패키지를 네임스페이스를 관리하기 위한 용도로만 사용한다. 그래서 패키지를 가시성 제어에 사용하지 않는다.
+    - 패키지 전용 가시성에 대한 대안으로 코틀린에는 internal이라는 새로운 가시성 변경자를 도입했다.
+        - internal은 "모듈 내부에서만 볼 수 있음"
+
+[Untitled](https://www.notion.so/2154c4431f2e4e058324591892de84d6)
+
+```kotlin
+internal open class TalkativeButton : Focusable {
+	private fun yell () = println("Hey!")
+
+	protected fun whisper() = println("Let's talk!")
+}
+
+// 오류 : "public" 멤버가 자신의 "internal" 수신 타입인 "TalkativeButton"을 노출함
+fun TalkativeButton.giveSpeech() { 
+	yell() // private 멤버여서 접근 불가
+
+	whisper() // protected 멤버여서 접근 불가
+}
+```
+
+- 오류를 해결하기 위해서는 giveSpeech 확장 함수의 가시성을 internal로 바꾸거나, TalkativeButton의 가시성을 public으로 바꿔야 한다.
+- 자바는 같은 패키지 안에서 protected 멤버 접근 가능하지만 코틀린은 아니다.
+
+## 4.1.4 내부 클래스와 중첩된 클래스: 기본적으로 중첩 클래스
+
+코틀린의 중첩 클래스(nested class)는 명시적으로 요청하지 않는 한 바깥쪽 클래스 인스턴스에 대한 접근 권한이 없다.
+
+### in 자바
+
+```kotlin
+interface State: Serializable
+
+interface View {
+	fun getCurrentState() : State
+	fun restoreState(state: State) {}
+}
+
+---
+
+/* 자바 */
+public class Button implements View {
+	@Override
+	public State getCurrentState() {
+		return new ButtonState()
+	}
+
+	@Override
+	public void resotreState(State state) { ... }
+	
+	public class ButtonState implements State { ... }
+	
+}
+```
+
+선언한 버튼의 상태를 직렬화하면  NotSerializableException!
+
+- 자바에서 다른 클래스 안에 정의한 클래스는 자동으로 내부 클래스(inner class)가 된다.
+    - 위 예제에서 ButtonState 클래스는 바깥쪽 Button 클래스에 대한 참조를 묵시적으로 포함한다.
+        - 그 참조로 인해 ButtonState를 직렬화할 수 없다. → Button을 직렬화할 수 없으므로 버튼에 대한 참조가 ButtonState의 직렬화를 방해한다.
+        - 이 문제를 해결하려면 ButtonState를 static 클래스로 선언해야 한다.
+
+### in 코틀린
+
+```kotlin
+class Button : View {
+	override fun getCurrentState() : State = ButtonState()
+
+	override fun restoreState(state: State) { ... }
+
+	class ButtonState : State { ... }
+}
+```
+
+코틀린 중첩 클래스에 아무런 변경자가 붙지 않으면 자바 static 중첩 클래스와 같다.
+
+이를 내부 클래스로 변경해서 바깥쪽 클래스에 대한 참조를 포함하게 만들고 싶다면 inner 변경자를 붙여야 한다.
+
+[Untitled](https://www.notion.so/0a2b26db972d4e18b6be285abdb118a6)
+
+### 코틀린에서 바깥쪽 클래스의 인스턴스를 가리키는 참조를 표기하는 방법
+
+this@Outer 사용
+
+```kotlin
+class Outer {
+	inner class Inner {
+		fun getOuterReference() : Outer = this@Outer
+	}
+}
+```
+
+## 4.1.5 봉인된 클래스: 클래스 계층 정의 시 계층 확장 제한
+
+상위 클래스에 sealed 변경자를 붙이면 그 상위 클래스를 상속한 하위 클래스 정의를 제한할 수 있다.
+
+sealed 클래스의 하위 클래스를 정의할 때는 반드시 상위 클래스 안에 중첩시켜야 한다.
+
+```kotlin
+sealed class Expr {
+	class Num(val value: Int) : Expr()
+	class SUm(val left: Expr, val right: Expr) : Expr()
+}
+
+fun eval(e: Expr) : Int = 
+	when (e) {
+		is Expr.Num -> e.value
+		is Expr.Sum -> eval(e.right) + eval(e.left)
+	}
+```
+
+- 이렇게 하면 디폴트 분기(else 분기)가 필요없다.
+- sealed로 표시된 클래스는 자동으로 open이다.
+
+---
+
+# 4.2 뻔하지 않은 생성자와 프로퍼티를 갖는 클래스 선언
+
+코틀린에서는 **주 생성자**와 **부 생성자**를 구분한다. 또한 코틀린에서는 초기화 블록을 통해 **초기화 로직**을 추가할 수 있다.
+
+## 4.2.1 클래스 초기화: 주 생성자와 초기화 블록
+
+```kotlin
+class User(val nickname: String)
+```
+
+클래스 이름 뒤에 오는 괄호로 둘러싸인 코드를 **주 생성자**라고 부른다.
+
+```kotlin
+class User constructor(_nickname: String) {
+	val nickname: String
+
+	init {
+		nickname = _nickname
+	}
+}
+
+--- 
+
+class User (_nickname: String) {
+	val nickname: _nickname
+}
+
+---
+
+class User(val nickname: String) // 'val'은 이 파라미터에 상응하는 프로퍼티가 생성된다는 뜻이다.
+
+// 생성자 파라미터에도 디폴트 값을 정의할 수 있다.
+class User(val nickname: String, val isSubscribed: Boolean = true)
+
+val hyun = User("현석") // new 키워드 없이 생성자 호출, isSubscribed에는 default 값
+val gye = User("계영", false)
+val hey = User("혜원", isSubscribed = false)
+```
+
+**기반 클래스를 초기화하 할 경우.**
+
+```kotlin
+open class User(val nickname: String) { ... }
+
+class TwitterUser(nickname: String) : User(nickname) { ... }
+```
+
+- 클래스를 정의할 때 별도로 생성자를 정의하지 않으면 컴파일러가 자동으로 아무 일도 하지 않는 인자가 없는 디폴트 생성자를 만들어준다.
+
+    ```kotlin
+    open class Button
+
+    class RadioButton: Button() // Button의 생성자의 인자가 없어도, 하위 클래스는 생성자를 호출 해야 한다. -> 최소 빈 괄호가 들어가야한다.
+    ```
+
+    - 인터페이스는 생성자가 없기 때문에 필요없다.
+
+**클래스를 외부에서 인스턴스화하지 못하게 막고 싶을 경우**
+
+```kotlin
+class Secretive private constructor() {}
+```
+
+- 클래스 안에는 주 생성자밖에 없고 그 주 생성자는 비공개이므로 외부에서는 Secretive를 인스턴스화할 수 없다.
+
+## 4.2.2 부 생성자: 상위 클래스를 다른 방식으로 초기화
+
+**코틀린에서 생성자가 여럿 필요한 경우**
+
+```kotlin
+open class View {
+	constructor (ctx: Context) {
+
+	}
+
+	constructor (ctx: Context, attr: AttributeSet) {
+
+	}
+
+}
+
+---
+
+class MyButton : View {
+	constructor (ctx: Context) : super(ctx) {
+	
+	}
+
+	constructor (ctx: Context, attr: AttributeSet) : super(ctx, attr) {
+
+	}
+}
+```
+
+**this()를 통해 클래스 자신의 다른 생성자를 호출**
+
+```kotlin
+class MyButton : View {
+	constructor(ctx: Context) : this(ctx, MY_STYLE) { ... }
+
+	constructor(ctx: Context, arrt: AttributeSet) : super(ctx, attr)
+}
+```
+
+보충
+
+- 부 생성자가 필요한 주도니 이유는 자바 상호운용성, 이외에는 클래스 인스턴스를 생성할 때 파라미터 목록이 다른 생성 방법이 여럿 존재하는 경우
+
+## 4.2.4 인터페이스에 선언된 프로퍼티 구현
+
+- 코틀린에서는 인터페이스에 추상 프로퍼티 선언을 넣을 수 있다.
+
+    ```kotlin
+    interface User {
+    	val nickname: String
+    }
+    ```
+
+    - 이는 User 인터페이스를 구현하는 클래스가 nickname의 값을 얻을 수 있는 방법을 제공해야 한다는 뜻
+- **인터페이스의 프로퍼티 구현하기**
+
+    ```kotlin
+    class PrivateUser(override val nickname: String) : User // 주 생성자에 있는 프로퍼티
+
+    class SubscribingUser(val email: String) : User {
+    	override val nickname: String
+    		get() = email.substringBefore('@') // 커스텀 게터
+    }
+
+    class FacebookUser(val accountId: Int) : User {
+    	override val nickname = getFacebookName(accountId) // 프로퍼티 초기화식
+    }
+    ```
+
+- 인터페이스에는 게터와 세터가 있는 프로퍼티를 선언할 수도 있다.
+    - 물론 게터/세터는 뒷받침하는 필드를 참조할 수 없다.
+
+    ```kotlin
+    interface User {
+    	val email: String // 반드시 오버라이드
+    	val nickname: String
+    		get() = email.substringBefore('@') // nickname은 오버라이드하지 않고 상속 가능
+    }
+    ```
+
+    ## 4.2.4 게터와 세터에서 뒷받침하는 필드에 접근
+
+    ```kotlin
+    class User(val name: String) {
+    	var address: String = "unspecified"
+    		set(value: String) {
+    			println("""
+    				Address was changed for $name:
+    				"$field" -> "$value".""".trimIndent())
+    			field = value		
+    		}
+    }
+    ```
+
+    ## 4.2.5 접근자와 가시성 변경
+
+    ```kotlin
+    class LengthCounter {
+    	var counter: Int = 0
+    		private set
+
+    	fun addWord(word: String) {
+    		counter += word.length
+    	}
+    }
+    ```
+
+    # 4.3 컴파일러가 생성한 메소드: 데이터 클래스와 클래스 위임
+
+    ## 4.3.1 모든 클래스가 정의해야 하는 메소드
+
+    **문자열 표현**
+
+    ```kotlin
+    class Client(val name: String, val postalCode: Int) {
+    	override fun toString() = "Client(name=$name, postalCode=$postalCode)"
+    }
+    ```
+
+    **객체의 동등성: equals()**
+
+    ```kotlin
+    class Client(val name: String, val postalCode: Int) {
+    	override fun equals(other: Any?) : Boolean {
+    		if (other == null || other !is Client) {
+    			return false
+    		}
+    		return name == other.name && postalCode == other.postalCode
+    	}
+    	
+    	override fun toString() = "Client(name=$name, postalCode=$postalCode)"
+    }
+    ```
+
+    **해시 컨테이너: hashCode()**
+
+    ```kotlin
+    class Client(val name: String, val postalCode: Int) {
+    	...
+    	
+    	override fun hashCode() = Int = name.hashCode() * 31 + postalCode
+    }
+    ```
+
+    ## 4.3.2 데이터 클래스: 모든 클래스가 정의해야 하는 메소드 자동 생성
+
+    data라는 변경자를 클래스 앞에 붙이면 필요한 메소드를 컴파일러가 자동으로 만들어준다.
+
+    ```kotlin
+    data class Client(val name: String, val postalCode: Int)
+    ```
+
+    - equals
+    - hashCode
+    - toString
+    - 이 외 몇 가지 유용한 메소드를 더 생성한다.
+
+    ### 데이터 클래스와 불변성: copy() 메소드
+
+    데이터 클래스 인스턴스를 불변 객체로 더 쉽게 활용할 수 있게 객체를 복사하면서 일부 프로퍼티를 바꿀 수 있게 해주는 copy 메소드다.
+
+    ```kotlin
+    val lee = CLient("이계영", 4122)
+    ```
+
+    ## 4.3.2 클래스 위임: by 키워드 사용
+
+    - 상속의 대안 "위임(Delegation)"
+
+        ```kotlin
+        class DelegatingCollection<T> : Collection<T> {
+        	private val innerList = arrayListOf<T>()
+
+        	override val size: Int get() = innerList.size
+        	override fun isEmpty() : Boolean = innerList.isEmpty()
+        	override fun contains(element: T): Boolean = innerList.contains(element)
+        	...
+        }
+        ```
+
+        ```kotlin
+        class DelegatingCollection<T> (
+        	innerList: Collection<T> = ArrayList<T>()
+        ) : Collection<T> by innerList {}
+        ```
+
+        ```kotlin
+        class CountingSet<T> (
+        	val innerSet: MutableCollection<T> = HashSet<T>()
+        ) : MutableCollection<T> by innerSet {
+        	var objectsAdded = 0
+
+        	override fun add(element: T): Boolean {
+        		objectsAdded++
+        		return innerSet.add(element)
+        	}
+
+        	override fun addAll(c: Collection<T>): Boolean {
+        		objectesAdded += c.size
+        		return innerSet.addAll(c)
+        	}
+        }
+        ```
+
+        - 추가 예제
+
+    ## 4.4 object 키워드: 클래스 선언과 인스턴스 생성
+
+    **object 키워드를 사용하는 여러 상황**
+
+    - 객체 선언(object declaration)은 싱글턴을 정의하는 방법 중 하나다.
+    - 동반 객체(companion object)는 인스턴스 메소드는 아니지만 어떤 클래스와 관련 있는 메소드와 팩토리 메소드를 담을 때 쓰인다.
+    - 객체 식은 자바의 무명 내부 클래스(anonymous inner class) 대신 쓰인다.
+
+    ### 4.4.1 객체 선언: 싱글턴을 쉽게 만들기
+
+    코틀린에서 **객체 선언**(클래스 선언과 그 클래스에 속한 단일 인스턴스의 선언을 합친 선언) 기능을 통해 싱글턴을 언어에서 기본 지원한다.
+
+    ```kotlin
+    object Payroll {
+    	val allEmployees = arrayListOf<Person>()
+
+    	fun calculateSalary() {
+    		for (person in allEmployees) {
+    			...
+    		}
+    	}
+    }
+    ```
+
+    - 생성자(주/부 생성자 모두) 객체 선언에 쓸 수 없다.
+
+    **코틀린 객체를 자바에서 사용하기**
+
+    ```kotlin
+    /* java */
+    CaseInsensistiveFileComparator.INSTANCE.compare(file1, file2); // INSTANCE 필드 타입은 CaseInsensistiveFileComparator
+
+    ```
+
+    ## 4.4.2 동반 객체: 팩토리 메소드와 정적 멤버가 들어갈 장소
+
+    코틀린 언어는 자바 static 키워드를 지원하지 않는다.
+
+    - 대신 **패키지 수준의 최상위 함수**(자바의 정적 메소드 역할을 거의 대신 할 수 있다)와 **객체 선언**(자바의 정적 메소드 역할 중 코틀린 최상위 함수가 대신할 수 없는 역할이나 정적 필드를 대신할 수 있다)을 활용한다
+        - 대부분의 경우 최상위 함수 활용을 권장
+
+    ```kotlin
+    class A {
+    	companion object {
+    		fun bar() {
+    			println("Companion object called")
+    		}
+    	}
+    }
+    ```
+
+    - 클래스 안에 정의된 객체 중 하나에 companion이라는 특별한 표시를 붙이면 그 클래스의 동반 객체로 만들 수 있다.
+        - 자바의 정적 메소드 호출이나 정적 필드 사용 구만과 같아진다.
+    - 동반 객체는 자신을 둘러싼 클래스의 모든 private 멤버에 접근이 가능하다.
+        - 따라서 바깥쪽 클래스의 private 생성자도 호출할 수 있다.
+        - 팩토리 패턴을 구현하기 적합
+
+            ```kotlin
+
+            class User {
+            	val nickname: String
+            	
+            	constructor(email: String) {
+            		nickname = email.substringBefore('@')
+            	}
+
+            	constructor(accountId: Int) {
+            		nickname = getFacebookName(accountId)
+            	}
+            }
+
+            -----
+
+            class User private constructor(val nickname: String) {
+            	companion obejct {
+            		fun newSubscribingUser(email: String) = User(email.substringBefore('@'))
+            		
+            		fun newFacebookUser(accountId: Int) = User(getFacebookName(accountId))
+            	}
+            }
+            ```
+
+            - 클래스를 확장해야만 하는 경우에는 동반 객체 멤버를 하위 클래스에서 오버라이드할 수 없으므로 여러 생성자를 사용하는 편이 더 나은 해법이다.
+
+## 4.4.3 동반 객체를 일반 객체처럼 사용
+
+동반 객체는 클래스 안에 정의된 일반 객체이므로 이름을 붙이거나 인터페이스를 상속, 확장 함수와 프로퍼티를 정의할 수 있다.
+
+```kotlin
+class Person(val name: String) {
+	companion object Loader {
+		fun fromJSON(jsonText: String): Person = ...
+	}
+}
+```
+
+- 특별히 이름을 지정하지 않으면 동반 객체 이름은 자동으로 Companion이 된다.
+
+### 동반 객체에서 인터페이스 구현
+
+```kotlin
+interface JSONFactory<T> {
+	fun fromJSON(jsonText: String): T
+}
+
+class Person(val name: String) {
+	companion Object : JSONFactory<Person> {
+		override fun fromJSON(jsonText: String): Person = ...
+	}
+}
+
+---
+
+fun loadFromJSON<T>(factory: JSONFactory<T>): T { ... }
+
+loadFromJSON(Person) // 동반 객체 인스턴스를 넘길 수 있다.
+```
+
+**자바에서 동반객체 사용**
+
+```kotlin
+/* java */
+Person.Companion.fromJSON("..."); // 동반 객체에 이름을 안붙이면 Companion
+```
+
+때로 자바에서 사용하기 위해 코틀린 클래스의 멤버를 정적인 멤버로 만들어야 한다.
+
+- @JvmStatic을 코틀린 멤버에 붙이면 된다.
+- 정적 필드의 경우는 @JvmField 애노테이션을 코틀린 멤버에 붙이면 된다.
+- 자바와의 상호운용성을 위해 존재하고 10장에서 다룬다..
+
+### 동반 객체 확장
+
+```kotlin
+class Person(val firstName: String, val lastName: String) {
+	companion Obejct { } // 비어있는 동반 객체 선언
+}
+
+fun Person.COmpanion.fromJSON(json: String): Person { ... } // 확장 함수 선언
+```
+
+## 4.4.4 객체 식: 무명 내부 클래스를 다른 방식으로 작성
+
+**무명 객체**를 정의할 때도 object 키워드를 쓴다.
+
+```kotlin
+window.addMouseListener (
+	obejct : MouseAdapter() {
+		override fun mouseClicked(e: MouseEvent) { ... }
+
+		override fun mouseEntered(e: MouseEvent) { ... }
+	}
+)
+```
+
+- 객체 선언과 같지만 객체 이름이 빠졌다. 객체 식은 클래스를 정의하고 그 클래스에 속한 인스턴스를 생성하지만, 그 클래스나 인스턴스에 이름을 붙이지는 않는다.
+- 객체에 이름을 붙여야 한다면 변수에 무명 객체를 대입하면 된다.
+
+    ```kotlin
+    val listener = obejct : MouseAdapter() {
+    	override fun mouseClicked(e: MouseEvent) { ... }
+    	override fun mouseEntered(e: MouseEvent) { ... }
+    }
+    ```
+
+- 무명 객체는 싱글턴이 아니다. 객체 식이 쓰일 때마다 새로운 인스턴스가 생성된다.
+- final이 아닌 변수도 객체 식 안에서 사용할 수 있다.
+
+    ```kotlin
+    fun countClicks(window: Window) {
+    	var clickCount = 0
+
+    	window.addMouseListener(object : MouseAdapter() {
+    		override fun mouseClicked(e: MouseEvent) {
+    			clickCount++
+    		}
+    	})
+    }
+    ```
