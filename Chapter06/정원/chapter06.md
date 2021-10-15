@@ -18,6 +18,7 @@ fun foo(s: String?) {
 ```
 
 ### 안전한 캐스트 as?
+<img width="543" alt="코틀린인액션1" src="https://user-images.githubusercontent.com/41745717/137455720-d0e76e88-d06b-4b1f-a70e-3518a97692e2.png">
 
 ### 널 아님 단언: !!
 
